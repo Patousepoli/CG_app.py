@@ -11,23 +11,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Carga del Logo OPP (versión robusta) --- #
-def load_logo():
+def cargar_logotipo():
     try:
-        # Intenta cargar desde archivo local
-        logo = Image.open("logo_opp.png")
+        logo = Image.open("LOGO_OPP.png")  # nombre exacto del archivo en GitHub
         st.image(logo, width=200)
     except FileNotFoundError:
-        try:
-            # Intenta cargar desde URL alternativa
-            st.image("https://www.gub.uy/ministerio-economia-finanzas/files/styles/escritorio/public/2021-03/opp_logo.png", width=200)
-        except:
-            # Fallback final
-            st.warning("Logo no disponible")
-            st.image("https://via.placeholder.com/200x100?text=LOGO+OPP", width=200)
+        # Logo alternativo si no se encuentra el archivo
+        st.image("https://via.placeholder.com/200x100?text=LOGO+OPP", width=200)
 
-# Mostrar logo y título
-load_logo()
+# Mostrar logotipo y título
+cargar_logotipo()
 st.title("Sistema de Compromisos de Gestión")
 
 # --- Conexión a la base de datos --- #
