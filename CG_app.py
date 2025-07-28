@@ -1,511 +1,352 @@
-import streamlit as st
-import pandas as pd
+import os
 import sqlite3
-from datetime import datetime
+import pandas as pd
+import streamlit as st
+from PIL import Image
 
-# Conexión a la base de datos
-conn = sqlite3.connect('cg_sistema_v3.db')
-c = conn.cursor()
+# --- Configuración inicial --- #
+st.set_page_config(
+    page_title="Sistema de Compromisos de Gestión - OPP",
+    page_icon="📋",
+    layout="wide"
+)
 
-# Crear tablas con la estructura mejorada
-c.executescript('''
-CREATE TABLE IF NOT EXISTS organismos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL UNIQUE,
-    descripcion TEXT
-);
+# --- Carga del Logo OPP (versión robusta) --- #
+def load_logo():
+    try:
+        # Intenta cargar desde archivo local
+        logo = Image.open("logo_opp.png")
+        st.image(logo, width=200)
+    except FileNotFoundError:
+        try:
+            # Intenta cargar desde URL alternativa
+            st.image("https://www.gub.uy/ministerio-economia-finanzas/files/styles/escritorio/public/2021-03/opp_logo.png", width=200)
+        except:
+            # Fallback final
+            st.warning("Logo no disponible")
+            st.image("https://via.placeholder.com/200x100?text=LOGO+OPP", width=200)
 
-CREATE TABLE IF NOT EXISTS areas_responsables (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    organismo_id INTEGER,
-    nombre TEXT NOT NULL,
-    responsable TEXT,
-    FOREIGN KEY (organismo_id) REFERENCES organismos(id)
-);
+# Mostrar logo y título
+load_logo()
+st.title("Sistema de Compromisos de Gestión")
 
-CREATE TABLE IF NOT EXISTS objetivos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL CHECK (tipo IN ('Estratégico', 'Operativo')),
-    nombre TEXT NOT NULL,
-    descripcion TEXT
-);
+# --- Conexión a la base de datos --- #
+def get_db_connection():
+    conn = sqlite3.connect('compromisos.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
-CREATE TABLE IF NOT EXISTS tipos_compromiso (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL CHECK (tipo IN ('Institucional', 'Funcional')),
-    descripcion TEXT
-);
-
-CREATE TABLE IF NOT EXISTS indicadores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    objetivo_id INTEGER,
-    organismo_id INTEGER,
-    area_id INTEGER,
-    nombre TEXT NOT NULL,
-    descripcion TEXT,
-    unidad_medida TEXT,
-    forma_calculo TEXT,
-    linea_base REAL,
-    meta_anual REAL,
-    plazo_vencimiento DATE,
-    FOREIGN KEY (objetivo_id) REFERENCES objetivos(id),
-    FOREIGN KEY (organismo_id) REFERENCES organismos(id),
-    FOREIGN KEY (area_id) REFERENCES areas_responsables(id)
-);
-
-CREATE TABLE IF NOT EXISTS compromisos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ficha TEXT UNIQUE,
-    tipo_compromiso_id INTEGER,
-    objetivo_id INTEGER,
-    organismo_id INTEGER,
-    area_id INTEGER,
-    responsable TEXT NOT NULL,
-    fecha_inicio DATE,
-    fecha_termino DATE,
-    clausula_salvaguarda TEXT,
-    FOREIGN KEY (tipo_compromiso_id) REFERENCES tipos_compromiso(id),
-    FOREIGN KEY (objetivo_id) REFERENCES objetivos(id),
-    FOREIGN KEY (organismo_id) REFERENCES organismos(id),
-    FOREIGN KEY (area_id) REFERENCES areas_responsables(id)
-);
-
-CREATE TABLE IF NOT EXISTS metas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    compromiso_id INTEGER,
-    indicador_id INTEGER,
-    meta_intermedia REAL,
-    meta_final REAL,
-    ponderacion_intermedia REAL CHECK (ponderacion_intermedia >= 0 AND ponderacion_intermedia <= 100),
-    ponderacion_final REAL CHECK (ponderacion_final >= 0 AND ponderacion_final <= 100),
-    cumplimiento REAL DEFAULT 0,
-    valor_actual REAL,
-    fecha_medicion DATE,
-    observaciones TEXT,
-    FOREIGN KEY (compromiso_id) REFERENCES compromisos(id),
-    FOREIGN KEY (indicador_id) REFERENCES indicadores(id)
-);
-
-CREATE TABLE IF NOT EXISTS historico_cumplimiento (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    meta_id INTEGER,
-    valor_reportado REAL,
-    fecha_reporte DATE,
-    observaciones TEXT,
-    FOREIGN KEY (meta_id) REFERENCES metas(id)
-);
-''')
-
-conn.commit()
-
-# Datos iniciales
-def inicializar_datos():
-    # Insertar organismos base si no existen
-    c.execute("SELECT COUNT(*) FROM organismos")
-    if c.fetchone()[0] == 0:
-        c.executemany("INSERT INTO organismos (nombre, descripcion) VALUES (?, ?)",
-                      [('Organismo Principal', 'Organismo central del sistema'),
-                       ('Departamento de Proyectos', 'Área encargada de la gestión de proyectos')])
+# --- Inicialización de la base de datos --- #
+def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    # Insertar áreas responsables si no existen
-    c.execute("SELECT COUNT(*) FROM areas_responsables")
-    if c.fetchone()[0] == 0:
-        org_id = pd.read_sql("SELECT id FROM organismos WHERE nombre = 'Organismo Principal'", conn).iloc[0]['id']
-        c.executemany("INSERT INTO areas_responsables (organismo_id, nombre, responsable) VALUES (?, ?, ?)",
-                      [(org_id, 'Gestión Estratégica', 'Director Estratégico'),
-                       (org_id, 'Operaciones', 'Gerente Operativo')])
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS indicadores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        codigo TEXT NOT NULL UNIQUE,
+        organismo TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        descripcion TEXT,
+        meta_anual REAL,
+        meta_trimestral1 REAL,
+        meta_trimestral2 REAL,
+        meta_trimestral3 REAL,
+        meta_trimestral4 REAL,
+        ponderacion REAL,
+        frecuencia TEXT,
+        unidad_medida TEXT,
+        fuente_informacion TEXT,
+        responsable_nombre TEXT,
+        responsable_cargo TEXT,
+        responsable_email TEXT,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
     
-    # Insertar tipos de compromiso si no existen
-    c.execute("SELECT COUNT(*) FROM tipos_compromiso")
-    if c.fetchone()[0] == 0:
-        c.executemany("INSERT INTO tipos_compromiso (tipo, descripcion) VALUES (?, ?)",
-                      [('Institucional', 'Compromisos alineados a los objetivos institucionales'),
-                       ('Funcional', 'Compromisos específicos de áreas funcionales')])
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS compromisos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        codigo TEXT NOT NULL UNIQUE,
+        id_indicador INTEGER,
+        area_responsable TEXT,
+        descripcion TEXT,
+        objetivo_estrategico TEXT,
+        fecha_inicio TEXT,
+        fecha_fin TEXT,
+        meta_final REAL,
+        ponderacion REAL,
+        etapa_revision TEXT DEFAULT 'Pendiente',
+        etapa_validacion TEXT DEFAULT 'Pendiente',
+        etapa_aprobacion TEXT DEFAULT 'Pendiente',
+        FOREIGN KEY (id_indicador) REFERENCES indicadores(id)
+    )
+    ''')
     
-    # Insertar objetivos base si no existen
-    c.execute("SELECT COUNT(*) FROM objetivos")
-    if c.fetchone()[0] == 0:
-        c.executemany("INSERT INTO objetivos (tipo, nombre, descripcion) VALUES (?, ?, ?)",
-                      [('Estratégico', 'Objetivo Estratégico 1', 'Descripción del objetivo estratégico principal'),
-                       ('Operativo', 'Objetivo Operativo 1', 'Descripción del objetivo operativo clave')])
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS responsables (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        cargo TEXT NOT NULL,
+        area TEXT NOT NULL,
+        rol TEXT NOT NULL,
+        email TEXT,
+        telefono TEXT,
+        id_compromiso INTEGER,
+        FOREIGN KEY (id_compromiso) REFERENCES compromisos(id)
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS seguimiento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_compromiso INTEGER,
+        fecha TEXT,
+        avance REAL,
+        meta_cumplida REAL,
+        ponderacion_avance REAL,
+        observaciones TEXT,
+        FOREIGN KEY (id_compromiso) REFERENCES compromisos(id)
+    )
+    ''')
     
     conn.commit()
+    conn.close()
 
-inicializar_datos()
+init_db()
 
-# Funciones auxiliares
-def calcular_cumplimiento(valor_actual, meta):
-    return (valor_actual / meta) * 100 if meta != 0 else 0
+# --- Pestañas principales --- #
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Indicadores y Metas", 
+    "📝 Compromisos", 
+    "🔍 Seguimiento",
+    "📑 Reportes"
+])
 
-def validar_ponderaciones(ponderacion_intermedia, ponderacion_final):
-    return abs((ponderacion_intermedia + ponderacion_final) - 100) < 0.01
-
-# Interfaz Streamlit
-st.title('Sistema de Control de Gestión')
-
-# Menú principal
-menu = st.sidebar.selectbox('Menú', [
-    'Registro de Indicadores',
-    'Registro de CG',
-    'Seguimiento',
-    'Reportes'
-], key='menu_principal')
-
-if menu == 'Registro de Indicadores':
-    st.header('Registro de Nuevo Indicador')
+# --- Pestaña 1: Indicadores y Metas --- #
+with tab1:
+    st.header("Registro de Indicadores y Metas")
     
-    with st.form(key='form_nuevo_indicador'):
+    with st.form("form_indicador", clear_on_submit=True):
+        st.subheader("Información Básica")
         col1, col2 = st.columns(2)
+        nombre = col1.text_input("Nombre del Indicador*")
+        codigo = col2.text_input("Código del Indicador*")
+        organismo = col1.selectbox("Organismo*", ["MEF", "MIEM", "MSP", "MTOP", "OTROS"])
+        tipo = col2.selectbox("Tipo de Indicador*", ["Eficiencia", "Eficacia", "Economía", "Calidad", "Satisfacción"])
+        descripcion = st.text_area("Descripción*")
         
-        with col1:
-            nombre = st.text_input("Nombre del Indicador*")
-            objetivo = st.selectbox(
-                "Objetivo Asociado*",
-                options=pd.read_sql("SELECT nombre FROM objetivos", conn)['nombre'],
-                key='select_objetivo_indicador'
-            )
-            organismo = st.selectbox(
-                "Organismo Reportante*",
-                options=pd.read_sql("SELECT nombre FROM organismos", conn)['nombre'],
-                key='select_organismo'
-            )
-            area = st.selectbox(
-                "Área Responsable*",
-                options=pd.read_sql("SELECT nombre FROM areas_responsables WHERE organismo_id = (SELECT id FROM organismos WHERE nombre = ?)", 
-                                   conn, params=(organismo,))['nombre'],
-                key='select_area'
-            )
-            
-        with col2:
-            unidad_medida = st.text_input("Unidad de Medida*")
-            forma_calculo = st.text_area("Fórmula de Cálculo*", height=100)
-            linea_base = st.number_input("Valor Base*", min_value=0.0)
-            plazo_vencimiento = st.date_input("Plazo de Vencimiento*", value=datetime.today())
+        st.subheader("Metas y Ponderación")
+        col1, col2 = st.columns(2)
+        meta_anual = col1.number_input("Meta Anual*", min_value=0.0)
+        ponderacion = col2.number_input("Ponderación (%)*", min_value=0, max_value=100, value=100)
         
-        descripcion = st.text_area("Descripción del Indicador")
+        st.subheader("Metas Trimestrales")
+        col1, col2, col3, col4 = st.columns(4)
+        meta_trimestral1 = col1.number_input("Trimestre 1", min_value=0.0, value=0.0)
+        meta_trimestral2 = col2.number_input("Trimestre 2", min_value=0.0, value=0.0)
+        meta_trimestral3 = col3.number_input("Trimestre 3", min_value=0.0, value=0.0)
+        meta_trimestral4 = col4.number_input("Trimestre 4", min_value=0.0, value=0.0)
+        
+        st.subheader("Medición y Responsable")
+        col1, col2 = st.columns(2)
+        frecuencia = col1.selectbox("Frecuencia de Medición*", ["Diaria", "Semanal", "Mensual", "Trimestral", "Semestral", "Anual"])
+        unidad_medida = col2.text_input("Unidad de Medida*")
+        fuente_informacion = st.text_input("Fuente de Información*")
+        
+        col1, col2 = st.columns(2)
+        responsable_nombre = col1.text_input("Nombre del Responsable*")
+        responsable_cargo = col2.text_input("Cargo del Responsable*")
+        responsable_email = col1.text_input("Email del Responsable*")
         
         if st.form_submit_button("Guardar Indicador"):
-            if not all([nombre, objetivo, organismo, area, unidad_medida, forma_calculo]):
-                st.error("Complete los campos obligatorios (*)")
+            if nombre and codigo and organismo:
+                conn = get_db_connection()
+                conn.execute('''
+                INSERT INTO indicadores (
+                    nombre, codigo, organismo, tipo, descripcion,
+                    meta_anual, meta_trimestral1, meta_trimestral2, meta_trimestral3, meta_trimestral4,
+                    ponderacion, frecuencia, unidad_medida, fuente_informacion,
+                    responsable_nombre, responsable_cargo, responsable_email
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    nombre, codigo, organismo, tipo, descripcion,
+                    meta_anual, meta_trimestral1, meta_trimestral2, meta_trimestral3, meta_trimestral4,
+                    ponderacion, frecuencia, unidad_medida, fuente_informacion,
+                    responsable_nombre, responsable_cargo, responsable_email
+                ))
+                conn.commit()
+                conn.close()
+                st.success("¡Indicador registrado correctamente!")
             else:
-                try:
-                    # Obtener IDs necesarios
-                    objetivo_id = pd.read_sql("SELECT id FROM objetivos WHERE nombre = ?", 
-                                            conn, params=(objetivo,)).iloc[0]['id']
-                    organismo_id = pd.read_sql("SELECT id FROM organismos WHERE nombre = ?", 
-                                             conn, params=(organismo,)).iloc[0]['id']
-                    area_id = pd.read_sql("SELECT id FROM areas_responsables WHERE nombre = ? AND organismo_id = ?", 
-                                         conn, params=(area, organismo_id)).iloc[0]['id']
-                    
-                    # Insertar indicador
-                    c.execute('''INSERT INTO indicadores
-                                (objetivo_id, organismo_id, area_id, nombre, descripcion, 
-                                 unidad_medida, forma_calculo, linea_base, plazo_vencimiento)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                             (objetivo_id, organismo_id, area_id, nombre, descripcion, 
-                              unidad_medida, forma_calculo, linea_base, plazo_vencimiento))
-                    
-                    conn.commit()
-                    st.success("Indicador registrado exitosamente!")
-                except Exception as e:
-                    conn.rollback()
-                    st.error(f"Error al guardar: {str(e)}")
+                st.error("Por favor complete los campos obligatorios (*)")
 
-elif menu == 'Registro de CG':
-    st.header('Registro de Nuevo Compromiso')
+# --- Pestaña 2: Compromisos --- #
+with tab2:
+    st.header("Registro de Compromisos")
     
-    with st.form(key='form_nuevo_cg'):
+    conn = get_db_connection()
+    indicadores = conn.execute("SELECT id, nombre FROM indicadores").fetchall()
+    conn.close()
+    
+    with st.form("form_compromiso", clear_on_submit=True):
+        st.subheader("Información General")
         col1, col2 = st.columns(2)
+        nombre = col1.text_input("Nombre del Compromiso*")
+        codigo = col2.text_input("Código del Compromiso*")
         
-        with col1:
-            ficha = st.text_input("Número de Ficha*")
-            tipo_compromiso = st.selectbox(
-                "Tipo de Compromiso*",
-                options=['Institucional', 'Funcional'],
-                key='tipo_compromiso'
+        if indicadores:
+            id_indicador = col1.selectbox(
+                "Indicador Asociado*",
+                options=[i['id'] for i in indicadores],
+                format_func=lambda x: next(i['nombre'] for i in indicadores if i['id'] == x)
             )
-            objetivo = st.selectbox(
-                "Objetivo Asociado*",
-                options=pd.read_sql("SELECT nombre FROM objetivos", conn)['nombre'],
-                key='select_objetivo'
-            )
-            organismo = st.selectbox(
-                "Organismo Reportante*",
-                options=pd.read_sql("SELECT nombre FROM organismos", conn)['nombre'],
-                key='select_organismo_cg'
-            )
-            
-        with col2:
-            area = st.selectbox(
-                "Área Responsable*",
-                options=pd.read_sql("SELECT nombre FROM areas_responsables WHERE organismo_id = (SELECT id FROM organismos WHERE nombre = ?)", 
-                                   conn, params=(organismo,))['nombre'],
-                key='select_area_cg'
-            )
-            responsable = st.text_input("Responsable*")
-            fecha_inicio = st.date_input("Fecha Inicio*", value=datetime.today())
-            fecha_termino = st.date_input("Fecha Término*", value=datetime.today())
+        else:
+            st.warning("No hay indicadores registrados. Cree uno primero.")
+            id_indicador = None
         
-        # Sección de indicadores y metas
-        st.subheader("Indicadores y Metas")
+        area_responsable = col2.text_input("Área Responsable*")
+        descripcion = st.text_area("Descripción*")
+        objetivo_estrategico = st.text_area("Objetivo Estratégico*")
         
-        indicador = st.selectbox(
-            "Indicador*",
-            options=pd.read_sql("SELECT nombre FROM indicadores WHERE objetivo_id = (SELECT id FROM objetivos WHERE nombre = ?)", 
-                              conn, params=(objetivo,))['nombre'],
-            key='select_indicador'
-        )
+        st.subheader("Plazos y Metas")
+        col1, col2, col3 = st.columns(3)
+        fecha_inicio = col1.text_input("Fecha de Inicio* (AAAA-MM-DD)")
+        fecha_fin = col2.text_input("Fecha de Finalización* (AAAA-MM-DD)")
+        meta_final = col3.number_input("Meta Final*", min_value=0.0)
+        ponderacion = st.number_input("Ponderación (%)*", min_value=0, max_value=100, value=100)
         
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        
-        with col_m1:
-            meta_intermedia = st.number_input("Meta Intermedia*", min_value=0.0)
-        with col_m2:
-            ponderacion_intermedia = st.number_input("Ponderación Intermedia (%)*", 
-                                                   min_value=0.0, max_value=100.0, value=50.0)
-        with col_m3:
-            meta_final = st.number_input("Meta Final*", min_value=0.0)
-        with col_m4:
-            ponderacion_final = st.number_input("Ponderación Final (%)*", 
-                                              min_value=0.0, max_value=100.0, value=50.0)
-        
-        clausula = st.text_area("Cláusula de Salvaguarda", height=100)
-        observaciones = st.text_area("Observaciones")
+        st.subheader("Etapas")
+        col1, col2, col3 = st.columns(3)
+        etapa_revision = col1.selectbox("Revisión", ["Pendiente", "En Proceso", "Completado"])
+        etapa_validacion = col2.selectbox("Validación", ["Pendiente", "En Proceso", "Completado"])
+        etapa_aprobacion = col3.selectbox("Aprobación", ["Pendiente", "En Proceso", "Completado"])
         
         if st.form_submit_button("Guardar Compromiso"):
-            if not all([ficha, responsable, objetivo, indicador, meta_intermedia, meta_final]):
-                st.error("Complete los campos obligatorios (*)")
-            elif not validar_ponderaciones(ponderacion_intermedia, ponderacion_final):
-                st.error("La suma de ponderaciones debe ser 100%")
+            if nombre and codigo and id_indicador:
+                conn = get_db_connection()
+                conn.execute('''
+                INSERT INTO compromisos (
+                    nombre, codigo, id_indicador, area_responsable,
+                    descripcion, objetivo_estrategico,
+                    fecha_inicio, fecha_fin, meta_final, ponderacion,
+                    etapa_revision, etapa_validacion, etapa_aprobacion
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    nombre, codigo, id_indicador, area_responsable,
+                    descripcion, objetivo_estrategico,
+                    fecha_inicio, fecha_fin, meta_final, ponderacion,
+                    etapa_revision, etapa_validacion, etapa_aprobacion
+                ))
+                conn.commit()
+                conn.close()
+                st.success("¡Compromiso registrado correctamente!")
             else:
-                try:
-                    # Obtener IDs necesarios
-                    tipo_id = pd.read_sql("SELECT id FROM tipos_compromiso WHERE tipo = ?",
-                                         conn, params=(tipo_compromiso,)).iloc[0]['id']
-                    objetivo_id = pd.read_sql("SELECT id FROM objetivos WHERE nombre = ?",
-                                           conn, params=(objetivo,)).iloc[0]['id']
-                    organismo_id = pd.read_sql("SELECT id FROM organismos WHERE nombre = ?",
-                                             conn, params=(organismo,)).iloc[0]['id']
-                    area_id = pd.read_sql("SELECT id FROM areas_responsables WHERE nombre = ? AND organismo_id = ?",
-                                        conn, params=(area, organismo_id)).iloc[0]['id']
-                    indicador_id = pd.read_sql("SELECT id FROM indicadores WHERE nombre = ?",
-                                            conn, params=(indicador,)).iloc[0]['id']
-                    
-                    # Insertar compromiso
-                    c.execute('''INSERT INTO compromisos
-                                (ficha, tipo_compromiso_id, objetivo_id, organismo_id, area_id,
-                                 responsable, fecha_inicio, fecha_termino, clausula_salvaguarda)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                             (ficha, tipo_id, objetivo_id, organismo_id, area_id,
-                              responsable, fecha_inicio, fecha_termino, clausula))
-                    
-                    compromiso_id = c.lastrowid
-                    
-                    # Insertar meta
-                    c.execute('''INSERT INTO metas
-                                (compromiso_id, indicador_id, meta_intermedia, meta_final,
-                                 ponderacion_intermedia, ponderacion_final, observaciones)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                             (compromiso_id, indicador_id, meta_intermedia, meta_final,
-                              ponderacion_intermedia, ponderacion_final, observaciones))
-                    
-                    conn.commit()
-                    st.success("Compromiso registrado exitosamente!")
-                except Exception as e:
-                    conn.rollback()
-                    st.error(f"Error al guardar: {str(e)}")
+                st.error("Por favor complete los campos obligatorios (*)")
 
-elif menu == 'Seguimiento':
-    st.header('Seguimiento de Compromisos')
+# --- Pestaña 3: Seguimiento --- #
+with tab3:
+    st.header("Seguimiento de Compromisos")
     
-    # Filtros
-    col_f1, col_f2, col_f3 = st.columns(3)
+    conn = get_db_connection()
+    compromisos = conn.execute("SELECT id, nombre FROM compromisos").fetchall()
     
-    with col_f1:
-        tipo_filtro = st.selectbox(
-            "Filtrar por tipo",
-            options=['Todos'] + pd.read_sql("SELECT DISTINCT tipo FROM tipos_compromiso", conn)['tipo'].tolist(),
-            key='filtro_tipo'
+    if compromisos:
+        with st.form("form_seguimiento"):
+            id_compromiso = st.selectbox(
+                "Seleccione Compromiso*",
+                options=[c['id'] for c in compromisos],
+                format_func=lambda x: next(c['nombre'] for c in compromisos if c['id'] == x)
+            )
+            
+            col1, col2, col3 = st.columns(3)
+            fecha = col1.text_input("Fecha (AAAA-MM-DD)*")
+            avance = col2.number_input("Avance (%)*", min_value=0, max_value=100)
+            meta_cumplida = col3.number_input("Meta Cumplida*", min_value=0.0)
+            
+            # Calcular ponderación del avance automáticamente
+            ponderacion_compromiso = conn.execute(
+                "SELECT ponderacion FROM compromisos WHERE id = ?", 
+                (id_compromiso,)
+            ).fetchone()['ponderacion']
+            
+            ponderacion_avance = (avance / 100) * ponderacion_compromiso
+            
+            st.metric("Ponderación del Avance", f"{ponderacion_avance:.2f}%")
+            
+            observaciones = st.text_area("Observaciones")
+            
+            if st.form_submit_button("Registrar Seguimiento"):
+                conn.execute('''
+                INSERT INTO seguimiento (
+                    id_compromiso, fecha, avance, meta_cumplida,
+                    ponderacion_avance, observaciones
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    id_compromiso, fecha, avance, meta_cumplida,
+                    ponderacion_avance, observaciones
+                ))
+                conn.commit()
+                st.success("¡Seguimiento registrado correctamente!")
+    else:
+        st.warning("No hay compromisos registrados para hacer seguimiento.")
+    
+    conn.close()
+
+# --- Pestaña 4: Reportes --- #
+with tab4:
+    st.header("Reportes")
+    
+    conn = get_db_connection()
+    
+    st.subheader("Indicadores")
+    df_indicadores = pd.read_sql("SELECT * FROM indicadores", conn)
+    if not df_indicadores.empty:
+        st.dataframe(df_indicadores)
+        
+        # Exportar a CSV
+        csv = df_indicadores.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Descargar Indicadores (CSV)",
+            data=csv,
+            file_name="indicadores.csv",
+            mime="text/csv"
         )
     
-    with col_f2:
-        objetivo_filtro = st.selectbox(
-            "Filtrar por objetivo",
-            options=['Todos'] + pd.read_sql("SELECT DISTINCT nombre FROM objetivos", conn)['nombre'].tolist(),
-            key='filtro_objetivo'
-        )
-    
-    with col_f3:
-        organismo_filtro = st.selectbox(
-            "Filtrar por organismo",
-            options=['Todos'] + pd.read_sql("SELECT DISTINCT nombre FROM organismos", conn)['nombre'].tolist(),
-            key='filtro_organismo'
-        )
-    
-    # Construir consulta SQL dinámica
-    query = '''SELECT c.ficha, tc.tipo AS tipo_compromiso, o.nombre AS objetivo,
-               org.nombre AS organismo, ar.nombre AS area, c.responsable, 
-               c.fecha_inicio, c.fecha_termino
-               FROM compromisos c
-               JOIN tipos_compromiso tc ON c.tipo_compromiso_id = tc.id
-               JOIN objetivos o ON c.objetivo_id = o.id
-               JOIN organismos org ON c.organismo_id = org.id
-               JOIN areas_responsables ar ON c.area_id = ar.id'''
-    
-    conditions = []
-    params = []
-    
-    if tipo_filtro != 'Todos':
-        conditions.append("tc.tipo = ?")
-        params.append(tipo_filtro)
-    
-    if objetivo_filtro != 'Todos':
-        conditions.append("o.nombre = ?")
-        params.append(objetivo_filtro)
-    
-    if organismo_filtro != 'Todos':
-        conditions.append("org.nombre = ?")
-        params.append(organismo_filtro)
-    
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-    
-    # Mostrar resultados
-    df_compromisos = pd.read_sql(query, conn, params=params)
-    
+    st.subheader("Compromisos")
+    df_compromisos = pd.read_sql("SELECT * FROM compromisos", conn)
     if not df_compromisos.empty:
         st.dataframe(df_compromisos)
         
-        # Seleccionar un compromiso para ver detalles
-        selected_ficha = st.selectbox(
-            "Seleccione un compromiso para ver detalles",
-            options=df_compromisos['ficha'],
-            key='select_detalle'
+        csv = df_compromisos.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Descargar Compromisos (CSV)",
+            data=csv,
+            file_name="compromisos.csv",
+            mime="text/csv"
         )
-        
-        if selected_ficha:
-            # Obtener detalles del compromiso seleccionado
-            detalle = pd.read_sql('''SELECT m.meta_intermedia, m.meta_final,
-                                    m.ponderacion_intermedia, m.ponderacion_final,
-                                    m.cumplimiento, m.valor_actual, m.fecha_medicion,
-                                    i.nombre AS indicador, i.unidad_medida, i.forma_calculo,
-                                    i.linea_base, i.plazo_vencimiento, m.observaciones
-                                    FROM metas m
-                                    JOIN indicadores i ON m.indicador_id = i.id
-                                    JOIN compromisos c ON m.compromiso_id = c.id
-                                    WHERE c.ficha = ?''',
-                                conn, params=(selected_ficha,))
-            
-            st.subheader("Metas Asociadas")
-            st.dataframe(detalle)
-            
-            # Actualización de seguimiento
-            with st.expander("Actualizar Seguimiento"):
-                with st.form(key='form_actualizar_seguimiento'):
-                    meta_id = detalle.index[0]  # Asumimos una meta por compromiso para simplificar
-                    valor_actual = st.number_input(
-                        "Valor Actual*",
-                        min_value=0.0,
-                        value=float(detalle.iloc[0]['valor_actual']) if detalle.iloc[0]['valor_actual'] else 0.0
-                    )
-                    fecha_medicion = st.date_input(
-                        "Fecha de Medición*",
-                        value=datetime.today()
-                    )
-                    obs_seguimiento = st.text_area("Observaciones de Seguimiento")
-                    
-                    if st.form_submit_button("Actualizar Seguimiento"):
-                        try:
-                            # Calcular cumplimiento
-                            cumplimiento = calcular_cumplimiento(
-                                valor_actual,
-                                detalle.iloc[0]['meta_final']
-                            )
-                            
-                            # Actualizar meta
-                            c.execute('''UPDATE metas
-                                        SET valor_actual = ?,
-                                            fecha_medicion = ?,
-                                            cumplimiento = ?,
-                                            observaciones = ?
-                                        WHERE id = ?''',
-                                     (valor_actual, fecha_medicion, cumplimiento, obs_seguimiento, meta_id))
-                            
-                            # Registrar en histórico
-                            c.execute('''INSERT INTO historico_cumplimiento
-                                        (meta_id, valor_reportado, fecha_reporte, observaciones)
-                                        VALUES (?, ?, ?, ?)''',
-                                     (meta_id, valor_actual, fecha_medicion, obs_seguimiento))
-                            
-                            conn.commit()
-                            st.success("Seguimiento actualizado exitosamente!")
-                        except Exception as e:
-                            conn.rollback()
-                            st.error(f"Error al actualizar: {str(e)}")
-            
-            # Gráfico de avance
-            if not detalle.empty:
-                st.subheader("Avance de Metas")
-                chart_data = detalle.set_index('indicador')[['meta_intermedia', 'meta_final', 'cumplimiento']]
-                st.bar_chart(chart_data)
-                
-                # Mostrar histórico de cumplimiento
-                historico = pd.read_sql('''SELECT valor_reportado, fecha_reporte, observaciones
-                                         FROM historico_cumplimiento
-                                         WHERE meta_id = ?
-                                         ORDER BY fecha_reporte''',
-                                      conn, params=(meta_id,))
-                
-                if not historico.empty:
-                    st.subheader("Histórico de Cumplimiento")
-                    st.line_chart(historico.set_index('fecha_reporte')['valor_reportado'])
-                    st.dataframe(historico)
-    else:
-        st.info("No hay compromisos con los filtros seleccionados")
-
-elif menu == 'Reportes':
-    st.header('Reportes de Gestión')
     
-    # Generar reporte consolidado
-    if st.button("Generar Reporte Consolidado", key='btn_reporte'):
-        reporte = pd.read_sql('''SELECT org.nombre AS organismo, 
-                                COUNT(DISTINCT c.id) AS total_compromisos,
-                                AVG(m.cumplimiento) AS avance_promedio,
-                                SUM(CASE WHEN m.cumplimiento >= 100 THEN 1 ELSE 0 END) AS cumplidos,
-                                SUM(CASE WHEN m.cumplimiento < 100 AND 
-                                    (julianday('now') - julianday(c.fecha_termino)) > 0 THEN 1 ELSE 0 END) AS atrasados
-                                FROM compromisos c
-                                JOIN organismos org ON c.organismo_id = org.id
-                                JOIN metas m ON m.compromiso_id = c.id
-                                GROUP BY org.nombre''', conn)
+    st.subheader("Seguimientos")
+    df_seguimiento = pd.read_sql("SELECT * FROM seguimiento", conn)
+    if not df_seguimiento.empty:
+        st.dataframe(df_seguimiento)
         
-        st.subheader("Reporte Consolidado por Organismo")
-        st.dataframe(reporte)
-        
-        # Gráficos
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.bar_chart(reporte.set_index('organismo')['total_compromisos'])
-        
-        with col2:
-            st.bar_chart(reporte.set_index('organismo')['avance_promedio'])
-        
-        # Reporte detallado por indicador
-        st.subheader("Detalle por Indicador")
-        detalle_indicadores = pd.read_sql('''SELECT i.nombre AS indicador, 
-                                            org.nombre AS organismo, 
-                                            ar.nombre AS area,
-                                            i.linea_base, i.meta_anual,
-                                            AVG(m.cumplimiento) AS cumplimiento_promedio,
-                                            i.plazo_vencimiento
-                                            FROM indicadores i
-                                            JOIN organismos org ON i.organismo_id = org.id
-                                            JOIN areas_responsables ar ON i.area_id = ar.id
-                                            LEFT JOIN metas m ON m.indicador_id = i.id
-                                            GROUP BY i.id''', conn)
-        
-        st.dataframe(detalle_indicadores)
+        csv = df_seguimiento.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Descargar Seguimientos (CSV)",
+            data=csv,
+            file_name="seguimientos.csv",
+            mime="text/csv"
+        )
+    
+    conn.close()
 
-# Cerrar conexión
-conn.close()
+# --- Instrucciones para el usuario --- #
+st.sidebar.markdown("""
+### Instrucciones:
+1. **Logo OPP**: Coloca el archivo `logo_opp.png` en la misma carpeta que este script.
+2. **Base de datos**: Se creará automáticamente (`compromisos.db`).
+3. **Exportación**: Los reportes se pueden descargar en formato CSV.
+""")
