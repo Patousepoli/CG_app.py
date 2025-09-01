@@ -1,82 +1,149 @@
-# 📋 Sistema de Compromisos de Gestión (CG)
+Sistema de Compromisos de Gestión (Streamlit) - Versión Mejorada
+================================================================
 
-Aplicación web para el registro, seguimiento y evaluación de compromisos institucionales, desarrollado para la OPP con tecnología Streamlit.
+Este sistema implementa la gestión de Compromisos de Gestión (CG) con acuerdos institucionales,
+fichas y metas, siguiendo la ficha oficial y los criterios de ponderaciones.
 
-![Logo OPP](https://www.opp.gub.uy/wp-content/uploads/2020/06/logo-opp-blanco.png)
+------------------------------------------------
+REQUISITOS
+------------------------------------------------
+- Python 3.9 o superior
+- Librerías requeridas:
+    * streamlit
+    * pandas
 
-## 🚀 Características principales
+Instalar con:
+    pip install streamlit pandas
 
-- **Registro de indicadores** con metas anuales y trimestrales
-- **Gestión de compromisos** con etapas de revisión/validación/aprobación
-- **Sistema de ponderación** automática de avances
-- **Seguimiento detallado** con historial de progreso
-- **Reportes exportables** en formato CSV
-- **Interfaz intuitiva** con diseño responsivo
+------------------------------------------------
+EJECUCIÓN
+------------------------------------------------
+1. Guardar el archivo principal como `app.py` dentro de una carpeta de proyecto (ej. `System_CG`).
+2. Colocar el logo de OPP en la misma carpeta con el nombre:
+     - `logo_opp.png`   (preferido)
+     - o `logo.png`     (alternativo)
+3. Desde la terminal, ejecutar:
+     streamlit run app.py
+4. Abrir el navegador en la URL que muestre (por defecto http://localhost:8501).
 
-## 🔧 Requisitos técnicos
+------------------------------------------------
+USUARIOS
+------------------------------------------------
+- El sistema se inicializa con un usuario administrador por defecto:
+    Usuario: admin
+    Contraseña: admin
+- Se recomienda cambiar la contraseña al primer ingreso.
+- Los usuarios se gestionan desde el menú de "Administración".
 
-- Python 3.8+
-- Dependencias:
-  ```bash
-  streamlit==1.17.0
-  pandas==1.5.3
-  pillow==9.5.0
-  sqlite3==3.39.0 (incluido en Python)
-🛠 Instalación local
-Clonar el repositorio:
+------------------------------------------------
+CÓDIGOS DE IDENTIFICACIÓN
+------------------------------------------------
+- Acuerdos: AC_####_AÑO (ej. AC_0001_2025)
+- Fichas:   F_####_AÑO (ej. F_0001_2025)
+- Metas:    identificador único interno (META_xxxxx)
 
-bash
-git clone https://github.com/tu-usuario/sistema-cg.git
-cd sistema-cg
-Instalar dependencias:
+------------------------------------------------
+FICHA DE META (Formato oficial)
+------------------------------------------------
+Cada ficha y meta exportada o importada en CSV sigue el formato de la ficha oficial:
 
-bash
-pip install -r requirements.txt
-Ejecutar la aplicación:
+Ficha de Meta incluye:
+  - Identificación (N° y nombre)
+  - Tipo de Meta (Institucional, Grupal, Individual)
+  - Alcance de la meta
+  - Objetivo
+  - Indicador
+  - Forma de cálculo
+  - Fuentes de información
+  - Valor base
+  - Meta (descripción)
+  - Plazo de vencimiento
+  - Responsable/s de seguimiento
+  - Rango de cumplimiento
+  - Ponderación
+  - Cláusula de Salvaguarda
+  - Observaciones
 
-bash
-streamlit run CG_app.py
-🖥️ Despliegue en Streamlit Cloud
-https://static.streamlit.io/badges/streamlit_badge_black_white.svg
+------------------------------------------------
+CSV - CARGA Y DESCARGA
+------------------------------------------------
+El sistema permite carga/descarga masiva de fichas y metas en formato CSV estructurado:
 
-Requiere cuenta en Streamlit Cloud
+- Dos columnas: Atributo, Valor
+- Orden y nombres de campos según ficha oficial
+- Bloques claramente identificados para cada Ficha y cada Meta
 
-Conectar con repositorio GitHub
+Ejemplo:
 
-Especificar ruta del archivo principal: CG_app.py
+    Atributo,Valor
+    Ficha,N°1
+    Identificación,F_0001_2025 - Producción
+    Tipo de Meta,Institucional
+    Alcance de la meta,Todos los funcionarios
+    Objetivo,Mejorar eficiencia en procesos
+    Indicador,% de procesos digitalizados
+    Forma de cálculo,(# digitalizados / total procesos)*100
+    Fuentes de información,Informe de Gestión
+    Valor base,25
+    Meta,Alcanzar 60%
+    Plazo de vencimiento,2025-12-31
+    Responsable/s de seguimiento,Director Área X
+    Rango de cumplimiento,>=95%:100;75-95%:parcial;<75%:0
+    Ponderación,50
+    Observaciones,Ninguna
+    ---
 
-📂 Estructura del proyecto
-text
-sistema-cg/
-├── CG_app.py            # Código principal
-├── logo_opp.png         # Logo institucional
-├── compromisos.db       # Base de datos (auto-generada)
-├── requirements.txt     # Dependencias
-└── README.md            # Este archivo
-🧩 Módulos incluidos
-Módulo	Funcionalidades
-📊 Indicadores	Metas anuales/trimestrales, ponderación
-📝 Compromisos	Etapas de gestión, áreas responsables
-🔍 Seguimiento	Registro de avances, cálculo automático
-📑 Reportes	Exportación a CSV, visualización de datos
-👨‍💻 Desarrollo
-Contribuciones
-Haz fork del proyecto
+    Meta,META_123abc
+    Descripción,Digitalizar procesos críticos
+    Unidad,%
+    Valor Objetivo,60
+    Sentido,>=
+    Frecuencia,Anual
+    Vencimiento,2025-12-31
+    Es hito,NO
+    Ponderación,50
+    Observaciones,N/A
+    ---
 
-Crea tu rama (git checkout -b feature/nueva-funcionalidad)
+El importador reconoce este formato y asigna los campos a los objetos de datos.
 
-Realiza commits descriptivos
+------------------------------------------------
+PONDERACIONES
+------------------------------------------------
+El sistema valida automáticamente las ponderaciones según los criterios oficiales:
 
-Abre un Pull Request
+- CG INSTITUCIONALES:
+  Para cada período de evaluación (intermedio, final, etc.), las metas deben sumar 100%.
+  Puede haber más de un período (ej. mayo y noviembre), pero en cada uno la suma es 100%.
 
-Variables de entorno
-Crear archivo .env para configuración:
+- CG FUNCIONALES:
+  La distribución recomendada es:
+    * Institucional: 30%
+    * Grupal/Sectorial: 50%
+    * Individual: 20%
+  El sistema verifica que las metas en cada categoría sumen estos porcentajes (o se redistribuyan proporcionalmente si falta alguna).
 
-text
-DB_NAME=compromisos.db
-DEBUG_MODE=False
-📄 Licencia
-Este proyecto está bajo licencia MIT.
+------------------------------------------------
+ADJUNTOS
+------------------------------------------------
+- Archivos asociados a acuerdos se guardan en: data/uploads/<ACUERDO_ID>/
+- Pueden descargarse individualmente o como ZIP.
 
-✉️ Contacto
-fpoli@opp.gub.uy
+------------------------------------------------
+PERSISTENCIA
+------------------------------------------------
+- Toda la información se guarda en la carpeta `data/`:
+    * agreements.json   (acuerdos)
+    * users.json        (usuarios)
+    * counters.json     (secuencias de códigos)
+    * audit.json        (registro de auditoría)
+
+------------------------------------------------
+CONTRATOS
+------------------------------------------------
+- Se genera automáticamente un contrato en formato RTF (Anexo II).
+
+------------------------------------------------
+CONTACTO
+------------------------------------------------
+Ante dudas o mejoras, revisar la documentación interna o contactar al administrador del sistema.
