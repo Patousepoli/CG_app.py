@@ -1,0 +1,31 @@
+﻿Identificación: N° y nombre/breve descripción;
+Atributo;Descripción
+Tipo de Meta:;Indicar el tipo de meta: Institucional, grupal o individual (en caso de ser un Compromiso funcional)
+Alcance de la meta:;Indicar a qué personas o grupo de personas abarca el cumplimiento de la meta
+Objetivo:;Indicar de forma clara y precisa lo que se pretende lograr. Propósito/s que se pretende alcanzar con el cumplimiento de  esta meta o eventualmente por un grupo de metas.
+Indicador:;Establecer la forma en que se medirá el grado de cumplimiento de la meta.
+Forma de cálculo:;Detallar la fórmula matemática a utilizar en función del indicador propuesto. Si para el indicador definido no hay fórmulas, deberá completarse “No corresponde”.
+Fuentes de información:;"Indicar la fuente/s de datos, documentos, informes, reportes u otro tipo de antecedente/s necesario/s para verificar las mediciones del indicador. Deberá definirse los requisitos de validez de la misma; por ejemplo, si es un informe, debe indicarse quien/es lo firma/n."
+Valor base:;Indicar los resultados de la medición previa reciente del indicador (mínimo dos años). Tiene que estar en la misma unidad que el Indicador y la Meta.
+;En el caso de tratarse de un nuevo proceso y no contar con antecedentes, se debe indicar N/A.
+Meta:;Indicar el logro específico -medido a través del indicador- en un tiempo determinado por su plazo de cumplimiento. Debe ser especificada teniendo en cuenta los valores observados en períodos anteriores y la premisa de mejora en los logros de la gestión.
+;Importante: puede haber más de una meta. Las metas pueden ser trimestrales, semestrales o anuales. Cada meta tendrá un plazo de vencimiento.
+Plazo de vencimiento:;Fecha máxima en que debe haberse logrado la meta. Si por alguna circunstancia, ésta difiriere de la fecha límite para su evaluación, se especificarán ambas. La última de estas fechas determinará el momento en que se harán efectivos los incentivos asociados al logro de la meta.
+Responsable/s del seguimiento y supervisión del cumplimiento:;Supervisores directos de quienes deben realizar las actividades para el cumplimiento de la meta.
+Rango de cumplimiento:;Indicar: 
+;#¿NOMBRE?
+;#¿NOMBRE?
+;- Rangos de cumplimiento intermedios, en caso de existir
+;
+;La escala deberá incentivar el cumplimiento del 100% de la meta.
+;Para metas que permitan una gradualidad:
+;·         Mayor al 95% meta cumplida (se cobra el 100%)
+;·         Desde 75% hasta 95% inclusive meta parcialmente cumplida (se cobra proporcional al cumplimiento)
+;·         Cumplimiento menor al 75% meta no cumplida (no se cobra)
+;Para metas de cumplimiento de hito:
+;·         Se cumple (se cobra el 100%)
+;·         No se cumple (no se cobra)
+Ponderación:;Cuando debe cumplirse simultáneamente más de una meta en una misma fecha para recibir el incentivo, es necesario establecer el peso relativo del cumplimiento de cada una de ellas respecto al 100% del incentivo a otorgar.
+;La ponderación debe incluirse necesariamente, pudiéndose distribuir en forma lineal o asignando mayor peso relativo a aquellas metas que se entienda pertinente en base a su importancia en el plan estratégico de la institución y/o el grado de esfuerzo que demanda su cumplimiento.
+Cláusula de Salvaguarda;Se activará sólo en caso de necesidad y que estén debidamente justificados.
+Observaciones:;Se deberá incluir antecedentes, comentarios/aclaraciones, descripciones o cualquier información que se considere pertinente o sea relevante para la compresión y correcta evaluación de la meta propuesta.
