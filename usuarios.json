@@ -1,1 +1,35 @@
-
+{
+  "administrador": {
+  "password": "admin",
+  "rol": "admin",
+  "activo": true
+  }, 
+  "admin": {
+    "username": "admin",
+    "name": "Administrador",
+    "role": "Administrador",
+    "active": true,
+    "password": "6e38204e2b09cfb0f64eab998b5c8ba4$daa7cf78fb46bf44e2de603f429bd4d3afe0f0e76b0c1c4623730d7f289df558"
+  },
+  "JP": {
+    "password": "a50a59674c177b81e92b2e9ac94ce588$dc5c622f23b25c5f49ecb529697e6c808a934572087a54d528a118a1abd605f7",
+    "name": "Juan Pérez",
+    "role": "Responsable de Acuerdo",
+    "active": true,
+    "last_modified": "2025-10-17T11:13:04.011595"
+  },
+  "francis": {
+    "password": "d2187e1d3c6b37a45decb0639ec4303b$64767088ed2880c125b519be4f7ceb9585d57f6671e148e202e88d8cd8591a11",
+    "name": "Francis Poli",
+    "role": "Supervisor OPP",
+    "active": true,
+    "last_modified": "2025-10-17T11:16:01.877968"
+  },
+  "mr": {
+    "password": "4a65d59cca0aebbab952b8e04a2ff294$9fbf49120270113ab560d3bf4b5b07f02f995e3350f29a1d0556c89927f08db4",
+    "name": "María Rodriguez",
+    "role": "Comisión CG",
+    "active": true,
+    "last_modified": "2025-10-17T11:27:34.463693"
+  }
+}
