@@ -1,0 +1,9 @@
+{
+  "admin": {
+    "password": "admin",
+    "role": "Administrador", 
+    "name": "Administrador",
+    "active": true,
+    "username": "admin"
+  }
+}
